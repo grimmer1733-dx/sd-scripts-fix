@@ -35,6 +35,8 @@ jobs:
                   rel = PurePosixPath(raw)
                   if rel.is_absolute() or ".." in rel.parts or (rel.parts and rel.parts[0] == ".git"):
                       raise SystemExit(f"Unsafe archive path: {item.filename}")
+                  if len(rel.parts) >= 2 and rel.parts[0] == ".github" and rel.parts[1] == "workflows":
+                      continue
                   if not rel.parts:
                       continue
 
