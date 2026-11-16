@@ -1,4 +1,5 @@
 name: Import source archive
+# Updated to trigger extraction of the uploaded project ZIP
 
 on:
   push:
