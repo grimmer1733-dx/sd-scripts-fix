@@ -1,0 +1,62 @@
+name: Import source archive
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/import-source-archive.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  unpack-and-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Extract project files safely
+        run: |
+          python - <<'PY'
+          from pathlib import Path, PurePosixPath
+          from zipfile import ZipFile
+          import shutil
+
+          archive = Path("sd-scripts-fix-public.zip")
+          if not archive.is_file():
+              raise SystemExit("The uploaded source ZIP was not found.")
+
+          with ZipFile(archive) as zf:
+              for item in zf.infolist():
+                  raw = item.filename.replace("\\\\", "/")
+                  rel = PurePosixPath(raw)
+                  if rel.is_absolute() or ".." in rel.parts or (rel.parts and rel.parts[0] == ".git"):
+                      raise SystemExit(f"Unsafe archive path: {item.filename}")
+                  if not rel.parts:
+                      continue
+
+                  target = Path(*rel.parts)
+                  if item.is_dir():
+                      target.mkdir(parents=True, exist_ok=True)
+                      continue
+
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  with zf.open(item) as source, target.open("wb") as destination:
+                      shutil.copyfileobj(source, destination)
+
+                  mode = (item.external_attr >> 16) & 0o777
+                  if mode:
+                      target.chmod(mode)
+
+          archive.unlink()
+          PY
+
+      - name: Commit extracted project
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Import project source files"
+          git push origin HEAD:main
